@@ -16,6 +16,6 @@ flask-sqlalchemy = "*"
 flask = "*"
 
 [requires]
-python_full_version = "3.12.1"
+python_full_version = "3.12.6"
 
 [dev-packages]

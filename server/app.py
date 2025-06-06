@@ -1,20 +1,23 @@
 from flask import Flask, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_restful import Api, Resource
 import os
 
-from models import db, Restaurant, Pizza, RestaurantPizza  # ✅ import from models.py
+from server.models import db, Restaurant, Pizza, RestaurantPizza
 
-# Setup
+# Initialize Flask app
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URI', 'sqlite:///pizza.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db.init_app(app)  # ✅ bind db instance to app
+# Initialize extensions
+db.init_app(app)
 migrate = Migrate(app, db)
 api = Api(app)
 
-# Resources
+# ------------------ Resources ------------------ #
+
 class RestaurantListResource(Resource):
     def get(self):
         restaurants = Restaurant.query.all()
@@ -33,9 +36,13 @@ class RestaurantResource(Resource):
         if not restaurant:
             return {"error": "Restaurant not found"}, 404
 
-        db.session.delete(restaurant)
-        db.session.commit()
-        return '', 204
+        try:
+            db.session.delete(restaurant)
+            db.session.commit()
+            return '', 204
+        except Exception as e:
+            db.session.rollback()
+            return {"error": f"Failed to delete restaurant: {str(e)}"}, 500
 
 
 class PizzaListResource(Resource):
@@ -47,18 +54,35 @@ class PizzaListResource(Resource):
 class RestaurantPizzaListResource(Resource):
     def post(self):
         data = request.get_json()
+
+        if not data:
+            return {"errors": ["No input provided"]}, 400
+
         price = data.get("price")
         restaurant_id = data.get("restaurant_id")
         pizza_id = data.get("pizza_id")
 
-        # Validate price
-        if price is None or not (1 <= price <= 30):
-            return {"errors": ["Price must be between 1 and 30"]}, 400
+        errors = []
+
+        if price is None:
+            errors.append("Price is required")
+        elif not isinstance(price, (int, float)) or not (1 <= price <= 30):
+            errors.append("Price must be a number between 1 and 30")
+
+        if not restaurant_id:
+            errors.append("Restaurant ID is required")
+
+        if not pizza_id:
+            errors.append("Pizza ID is required")
+
+        if errors:
+            return {"errors": errors}, 400
 
         restaurant = Restaurant.query.get(restaurant_id)
         pizza = Pizza.query.get(pizza_id)
+
         if not restaurant or not pizza:
-            return {"errors": ["Restaurant or Pizza not found"]}, 400
+            return {"errors": ["Restaurant or Pizza not found"]}, 404
 
         try:
             new_rp = RestaurantPizza(price=price, restaurant=restaurant, pizza=pizza)
@@ -67,13 +91,16 @@ class RestaurantPizzaListResource(Resource):
             return pizza.to_dict(), 201
         except Exception as e:
             db.session.rollback()
-            return {"errors": [str(e)]}, 400
+            return {"errors": [str(e)]}, 500
 
-# Register endpoints
+# ------------------ Routes ------------------ #
+
 api.add_resource(RestaurantListResource, '/restaurants')
 api.add_resource(RestaurantResource, '/restaurants/<int:id>')
 api.add_resource(PizzaListResource, '/pizzas')
 api.add_resource(RestaurantPizzaListResource, '/restaurant_pizzas')
+
+# ------------------ Run App ------------------ #
 
 if __name__ == '__main__':
     app.run(debug=True)
