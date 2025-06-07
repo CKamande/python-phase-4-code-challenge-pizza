@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import pytest
-from server import create_app, db  # Assume this is where your db instance and app factory live
+from server import create_app, db  # Adjust this if needed
 
 def pytest_itemcollected(item):
     par = item.parent.obj
@@ -11,9 +11,9 @@ def pytest_itemcollected(item):
         item._nodeid = ' '.join((pref, suf))
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope='session')
 def test_app():
-    """Create and configure a new app instance for each test module."""
+    """Create and configure a new app instance once per test session."""
     app = create_app({
         'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
         'TESTING': True,
@@ -21,12 +21,19 @@ def test_app():
     })
 
     with app.app_context():
-        db.create_all()
         yield app
-        db.session.remove()
-        db.drop_all()
 
-@pytest.fixture(scope='module')
+
+@pytest.fixture(scope='function')
+def init_database(test_app):
+    """Set up and tear down the database for each test function."""
+    db.create_all()
+    yield db
+    db.session.remove()
+    db.drop_all()
+
+
+@pytest.fixture(scope='function')
 def client(test_app):
-    """A test client for the app."""
+    """A test client for the app (clean per test)."""
     return test_app.test_client()

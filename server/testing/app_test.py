@@ -1,14 +1,19 @@
 import unittest
-from app import app, db, Restaurant, Pizza, RestaurantPizza
-import json
+from server import create_app
+from server.models import db, Restaurant, Pizza, RestaurantPizza
 
 class AppTestCase(unittest.TestCase):
     def setUp(self):
-        app.config['TESTING'] = True
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
-        self.client = app.test_client()
+        # Create the Flask test app with config
+        self.app = create_app({
+            'TESTING': True,
+            'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
+            'SQLALCHEMY_TRACK_MODIFICATIONS': False
+        })
+        self.client = self.app.test_client()
 
-        with app.app_context():
+        # Setup database in the app context
+        with self.app.app_context():
             db.create_all()
 
             # Seed test data
@@ -24,7 +29,8 @@ class AppTestCase(unittest.TestCase):
             db.session.commit()
 
     def tearDown(self):
-        with app.app_context():
+        # Clean up database
+        with self.app.app_context():
             db.session.remove()
             db.drop_all()
 
@@ -34,11 +40,11 @@ class AppTestCase(unittest.TestCase):
         self.assertEqual(len(res.get_json()), 2)
 
     def test_get_single_restaurant_success(self):
-        with app.app_context():
+        with self.app.app_context():
             restaurant = Restaurant.query.first()
-            res = self.client.get(f'/restaurants/{restaurant.id}')
-            self.assertEqual(res.status_code, 200)
-            self.assertIn('name', res.get_json())
+        res = self.client.get(f'/restaurants/{restaurant.id}')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('name', res.get_json())
 
     def test_get_single_restaurant_not_found(self):
         res = self.client.get('/restaurants/999')
@@ -46,10 +52,10 @@ class AppTestCase(unittest.TestCase):
         self.assertIn('error', res.get_json())
 
     def test_delete_restaurant_success(self):
-        with app.app_context():
+        with self.app.app_context():
             restaurant = Restaurant.query.first()
-            res = self.client.delete(f'/restaurants/{restaurant.id}')
-            self.assertEqual(res.status_code, 204)
+        res = self.client.delete(f'/restaurants/{restaurant.id}')
+        self.assertEqual(res.status_code, 204)
 
     def test_delete_restaurant_not_found(self):
         res = self.client.delete('/restaurants/999')
@@ -61,28 +67,29 @@ class AppTestCase(unittest.TestCase):
         self.assertEqual(len(res.get_json()), 2)
 
     def test_create_restaurant_pizza_success(self):
-        with app.app_context():
+        with self.app.app_context():
             restaurant = Restaurant.query.first()
             pizza = Pizza.query.first()
 
-            payload = {
-                "price": 10,
-                "restaurant_id": restaurant.id,
-                "pizza_id": pizza.id
-            }
-            res = self.client.post('/restaurant_pizzas', json=payload)
-            self.assertEqual(res.status_code, 201)
-            self.assertEqual(res.get_json()['name'], pizza.name)
+        payload = {
+            "price": 10,
+            "restaurant_id": restaurant.id,
+            "pizza_id": pizza.id
+        }
+        res = self.client.post('/restaurant_pizzas', json=payload)
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.get_json()['name'], pizza.name)
 
     def test_create_restaurant_pizza_price_invalid(self):
-        with app.app_context():
+        with self.app.app_context():
             restaurant = Restaurant.query.first()
             pizza = Pizza.query.first()
 
-            payload = {
-                "price": 100,
-                "restaurant_id": restaurant.id,
-                "pizza_id": pizza.id
-            }
-            res = self.client.post('/restaurant_pizzas', json=payload)
-
+        payload = {
+            "price": 100,  # invalid price > 30
+            "restaurant_id": restaurant.id,
+            "pizza_id": pizza.id
+        }
+        res = self.client.post('/restaurant_pizzas', json=payload)
+        self.assertIn(res.status_code, (400, 422))  # Accept either depending on validation
+        self.assertIn('error', res.get_json())
