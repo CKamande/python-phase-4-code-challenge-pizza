@@ -1,5 +1,5 @@
-from flask import Blueprint, jsonify, request
-from server.models import db, Restaurant, RestaurantPizza
+from flask import Blueprint, jsonify
+from server.models import db, Restaurant
 
 restaurant_bp = Blueprint('restaurant_bp', __name__)
 

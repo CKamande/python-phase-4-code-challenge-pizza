@@ -1,7 +1,7 @@
 import pytest
 from faker import Faker
 from server.models import db, Restaurant, Pizza, RestaurantPizza
-from server import create_app
+from server.app import create_app
 
 @pytest.fixture(scope='module')
 def test_app():

@@ -1,5 +1,5 @@
 import unittest
-from server import create_app
+from server.app import create_app
 from server.models import db, Restaurant, Pizza, RestaurantPizza
 
 class AppTestCase(unittest.TestCase):

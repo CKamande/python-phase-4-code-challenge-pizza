@@ -1,5 +1,7 @@
-from server.app import app
+from server.app import create_app
 from server.models import db, Restaurant, Pizza, RestaurantPizza
+
+app = create_app()
 
 with app.app_context():
     print("Deleting data...")

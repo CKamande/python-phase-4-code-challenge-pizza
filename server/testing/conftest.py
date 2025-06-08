@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import pytest
-from server import create_app, db  # Adjust this if needed
+from server.app import create_app
+from server.models import db
 
 def pytest_itemcollected(item):
     par = item.parent.obj
